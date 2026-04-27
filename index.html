@@ -229,6 +229,15 @@
   </style>
 </head>
 <body>
+<script>
+  if (window.netlifyIdentity) {
+    window.netlifyIdentity.on("init", user => {
+      if (!user) {
+        window.netlifyIdentity.open(); // Force login modal if not logged in
+      }
+    });
+  }
+</script>  
 <div class="shell">
   <!-- TOPBAR -->
   <div class="topbar">

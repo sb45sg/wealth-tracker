@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wealth Tracker</title>
+    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; }
+        /* Hide app by default */
+        #app-content { display: none; max-width: 800px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .logout-btn { background: #ff4b2b; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        /* Simple styling for the tracker */
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+
+    <div id="app-content">
+        <div class="header">
+            <h1>Family Wealth Tracker</h1>
+            <button class="logout-btn" onclick="netlifyIdentity.logout()">Logout</button>
+        </div>
+
+        <div class="card">
+            <h2>Welcome to your Dashboard</h2>
+            <p>Your sensitive financial data is now protected.</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Asset</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Savings Account</td>
+                        <td>$0.00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const appContent = document.getElementById('app-content');
+
+        // Initialize Netlify Identity
+        netlifyIdentity.on('init', user => {
+            if (!user) {
+                // If not logged in, force open the login modal
+                netlifyIdentity.open();
+            } else {
+                // If logged in, show the content
+                appContent.style.display = 'block';
+            }
+        });
+
+        // Handle Login
+        netlifyIdentity.on('login', user => {
+            netlifyIdentity.close();
+            appContent.style.display = 'block';
+        });
+
+        // Handle Logout
+        netlifyIdentity.on('logout', () => {
+            appContent.style.display = 'none';
+            netlifyIdentity.open();
+        });
+    </script>
+</body>
+</html>

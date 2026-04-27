@@ -228,30 +228,6 @@
   </style>
 </head>
 <body>
-<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-
-<script>
-  // Open the modal automatically if the user isn't logged in
-  netlifyIdentity.on('init', user => {
-    if (!user) {
-      netlifyIdentity.open();
-    }
-  });
-
-  // Once they log in, close the modal and refresh or show content
-  netlifyIdentity.on('login', user => {
-    console.log('Logged in as:', user.email);
-    netlifyIdentity.close();
-    // Optional: window.location.reload(); 
-  });
-
-  // Handle the redirect after Google login
-  if (window.location.hash) {
-    netlifyIdentity.on('init', () => {
-      // This helps process the login token in the URL
-    });
-  }
-</script>
 <div class="shell">
   <!-- TOPBAR -->
   <div class="topbar">

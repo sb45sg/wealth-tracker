@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wealth Tracker — Family Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0e0f11;
+      --bg2: #16181c;
+      --bg3: #1e2026;
+      --border: rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.12);
+      --text: #f0f0f0;
+      --text2: #8a8f9e;
+      --text3: #555a6a;
+      --green: #22c987;
+      --green-dim: rgba(34,201,135,0.12);
+      --blue: #4b9ef5;
+      --amber: #f5a623;
+      --rose: #f07080;
+      --purple: #a78bfa;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    /* ── Layout ── */
+    .shell { max-width: 1100px; margin: 0 auto; padding: 0 20px 60px; }
+    /* ── Topbar ── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 24px 0 0; gap: 12px; flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: baseline; gap: 10px; }
+    .brand h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
+    .brand span { font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; }
+    .cur-toggle { display: flex; gap: 4px; }
+    .ctog {
+      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+      cursor: pointer; border: 1px solid var(--border2);
+      background: none; color: var(--text2); transition: all .15s;
+    }
+    .ctog.active { background: var(--green); color: #000; border-color: transparent; }
+    .ctog:hover:not(.active) { background: var(--bg3); color: var(--text); }
+    /* ── Tabs ── */
+    .tab-row {
+      display: flex; gap: 2px; padding: 20px 0 0; flex-wrap: wrap;
+      border-bottom: 1px solid var(--border); margin-bottom: 24px;
+    }
+    .tab {
+      padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer;
+      border: none; background: none; color: var(--text2);
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: all .15s; border-radius: 4px 4px 0 0;
+    }
+    .tab.active { color: var(--text); border-bottom-color: var(--green); }
+    .tab:hover:not(.active) { color: var(--text); background: var(--bg2); }
+    /* ── Panels ── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+    /* ── Cards ── */
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+    }
+    .card + .card { margin-top: 14px; }
+    .card-title { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .8px; color: var(--text2); margin-bottom: 14px; }
+    /* ── Summary strip ── */
+    .sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; margin-bottom: 20px; }
+    .scard {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 20px;
+    }
+    .scard.hi { background: var(--green); border-color: transparent; }
+    .scard .sl { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--text2); margin-bottom: 6px; }
+    .scard.hi .sl { color: rgba(0,0,0,.6); }
+    .scard .sv { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; color: var(--text); }
+    .scard.hi .sv { color: #000; }
+    .scard .ss { font-size: 12px; color: var(--text2); margin-top: 3px; }
+    .scard.hi .ss { color: rgba(0,0,0,.5); }
+    /* ── Goal bar ── */
+    .goal-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 20px;
+    }
+    .goal-hdr { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+    .goal-title { font-size: 14px; font-weight: 600; }
+    .goal-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+    .goal-pct { font-size: 28px; font-weight: 600; color: var(--green); font-family: 'DM Mono', monospace; }
+    .bar-track { height: 8px; border-radius: 4px; background: var(--bg3); overflow: hidden; margin-bottom: 10px; }
+    .bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--green), #5de8a8); transition: width .8s cubic-bezier(.4,0,.2,1); }
+    .goal-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; }
+    /* ── Chart grid ── */
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--text2); }
+    .legend span { display: flex; align-items: center; gap: 5px; }
+    .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+    /* ── Table ── */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: var(--text3); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+    td { padding: 10px 10px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg3); }
+    tfoot tr td { background: var(--bg3) !important; font-weight: 600; }
+    /* ── Badges ── */
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+    .b-blue { background: rgba(75,158,245,.15); color: #7ab8ff; }
+    .b-green { background: rgba(34,201,135,.15); color: #22c987; }
+    .b-amber { background: rgba(245,166,35,.15); color: #f5a623; }
+    .b-rose { background: rgba(240,112,128,.15); color: #f07080; }
+    .b-purple { background: rgba(167,139,250,.15); color: #a78bfa; }
+    .b-gray { background: var(--bg3); color: var(--text2); }
+    .owner-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    /* ── Buttons ── */
+    .btn-primary {
+      padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+      border-radius: 8px; background: var(--green); color: #000; border: none; transition: opacity .15s;
+    }
+    .btn-primary:hover { opacity: .85; }
+    .btn-ghost {
+      padding: 8px 18px; font-size: 13px; font-weight: 500; cursor: pointer;
+      border-radius: 8px; background: none; color: var(--text2);
+      border: 1px solid var(--border2); transition: all .15s;
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--border2); background: var(--bg3); }
+    .btn-icon {
+      background: none; border: none; cursor: pointer; padding: 4px 8px;
+      border-radius: 6px; font-size: 12px; color: var(--text2); transition: all .15s;
+    }
+    .btn-icon:hover { background: var(--bg3); color: var(--text); }
+    .btn-icon.danger:hover { color: var(--rose); }
+    /* ── Forms ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 12px; color: var(--text2); font-weight: 500; }
+    input[type="text"], input[type="number"], select {
+      width: 100%; padding: 8px 12px; border-radius: 8px;
+      border: 1px solid var(--border2); background: var(--bg3);
+      color: var(--text); font-size: 13px; font-family: 'DM Sans', sans-serif;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--green); }
+    select option { background: var(--bg3); }
+    input[type="range"] { accent-color: var(--green); width: 100%; cursor: pointer; }
+    /* ── Slider rows ── */
+    .slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; color: var(--text2); }
+    .slider-row input { flex: 1; }
+    .slider-val { min-width: 44px; font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: var(--text); text-align: right; }
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 16px; padding: 28px; width: 100%; max-width: 480px;
+    }
+    .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+    /* ── Scenario cards ── */
+    .sc-result { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .sc-item { background: var(--bg3); border-radius: 10px; padding: 14px 16px; }
+    .sc-item .scl { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .sc-item .scv { font-size: 16px; font-weight: 600; color: var(--text); }
+    .sc-item .scd { font-size: 12px; margin-top: 2px; }
+    .pos { color: var(--green); } .neg { color: var(--rose); }
+    /* ── Snap card ── */
+    .snap-card {
+      background: var(--bg3); border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .snap-card .sn { font-weight: 600; font-size: 14px; }
+    .snap-card .sd { font-size: 12px; color: var(--text2); margin-top: 2px; }
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 2px dashed var(--border2); border-radius: 12px;
+      padding: 40px 20px; text-align: center; cursor: pointer;
+      transition: all .15s; margin-bottom: 16px;
+    }
+    .drop-zone:hover, .drop-zone.over { background: var(--bg3); border-color: var(--green); }
+    .drop-icon { font-size: 32px; margin-bottom: 10px; }
+    .drop-zone p { font-size: 14px; color: var(--text2); }
+    .drop-zone small { font-size: 12px; color: var(--text3); }
+    /* ── Savings highlight ── */
+    .savings-hero {
+      background: linear-gradient(135deg, rgba(34,201,135,.1), rgba(75,158,245,.05));
+      border: 1px solid rgba(34,201,135,.25); border-radius: var(--radius); padding: 22px; margin-bottom: 16px;
+    }
+    .savings-hero h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+    /* ── Two col ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    /* ── Exchange rates bar ── */
+    .rates-bar {
+      display: flex; align-items: center; gap: 20px; padding: 12px 16px;
+      background: var(--bg3); border-radius: 10px; font-size: 13px; color: var(--text2);
+      flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .rates-bar b { color: var(--text); }
+    .rates-bar input { width: 80px; }
+    /* ── Status messages ── */
+    .msg-success { color: var(--green); font-size: 13px; text-align: center; margin-top: 8px; }
+    .msg-error { color: var(--rose); font-size: 13px; text-align: center; margin-top: 8px; }
+    /* ── Code block ── */
+    code { font-family: 'DM Mono', monospace; font-size: 11px; background: var(--bg3); padding: 2px 6px; border-radius: 4px; color: var(--amber); }
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .chart-row, .two-col { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .sc-result { grid-template-columns: 1fr 1fr; }
+      .sum-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 400px) {
+      .sum-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="brand">
+      <h1>Wealth Tracker</h1>
+      <span id="sub-date">Family portfolio</span>
+    </div>
+    <div class="cur-toggle">
+      <button class="ctog active" onclick="setCur('INR',this)">INR</button>
+      <button class="ctog" onclick="setCur('USD',this)">USD</button>
+      <button class="ctog" onclick="setCur('SGD',this)">SGD</button>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tab-row">
+    <button class="tab active" onclick="showP('overview',this)">Overview</button>
+    <button class="tab" onclick="showP('assets',this)">Assets</button>
+    <button class="tab" onclick="showP('breakdown',this)">Breakdown</button>
+    <button class="tab" onclick="showP('scenarios',this)">What-if</button>
+    <button class="tab" onclick="showP('snapshots',this)">Snapshots</button>
+    <button class="tab" onclick="showP('savings',this)">Savings Plan</button>
+    <button class="tab" onclick="showP('importex',this)">Import / Export</button>
+  </div>
+
+  <!-- ══════════ OVERVIEW ══════════ -->
+  <div class="panel active" id="panel-overview">
+    <div class="sum-grid" id="sum-cards"></div>
+    <div class="goal-card">
+      <div class="goal-hdr">
+        <div>
+          <div class="goal-title">Retirement Goal — 100 Cr INR</div>
+          <div class="goal-sub">Combined family portfolio against lifetime target</div>
+        </div>
+        <div class="goal-pct" id="g-pct">0%</div>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="g-bar" style="width:0%"></div></div>
+      <div class="goal-meta"><span id="g-cur"></span><span id="g-rem"></span></div>
+    </div>
+    <div class="chart-row">
+      <div class="card"><div class="card-title">By asset type</div><div style="position:relative;height:180px"><canvas id="cType"></canvas></div><div class="legend" id="lg-type"></div></div>
+      <div class="card"><div class="card-title">By owner</div><div style="position:relative;height:180px"><canvas id="cOwner"></canvas></div><div class="legend" id="lg-owner"></div></div>
+    </div>
+    <div class="card"><div class="card-title">By home currency (INR equivalent)</div><div style="position:relative;height:160px"><canvas id="cCur"></canvas></div></div>
+  </div>
+
+  <!-- ══════════ ASSETS ══════════ -->
+  <div class="panel" id="panel-assets">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+      <span style="font-weight:600;font-size:15px">All assets <span id="a-count" style="color:var(--text2);font-weight:400;font-size:13px"></span></span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="srch" placeholder="Search assets…" style="width:180px" oninput="renderTable()">
+        <button class="btn-primary" onclick="document.getElementById('add-modal').classList.add('open')">+ Add asset</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Asset</th><th>Owner</th><th>Type</th><th>Amount (orig.)</th><th id="val-hdr">Value</th><th>Actions</th></tr></thead>
+          <tbody id="a-tbody"></tbody>
+          <tfoot><tr><td colspan="4" style="padding:10px">Total</td><td id="t-cell"></td><td></td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ BREAKDOWN ══════════ -->
+  <div class="panel" id="panel-breakdown">
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">Person A</div>
+        <div class="scard" style="margin-bottom:12px"><div class="sl">Total</div><div class="sv" id="pA-tot">—</div></div>
+        <div style="position:relative;height:155px"><canvas id="cPA"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Person B</div>
+        <div class="scard" style="margin-bottom:12px"><div class="sl">Total</div><div class="sv" id="pB-tot">—</div></div>
+        <div style="position:relative;height:155px"><canvas id="cPB"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Allocation by owner</div>
+      <div class="legend" id="lg-stacked"></div>
+      <div style="position:relative;height:200px"><canvas id="cStk"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Retirement projection</div>
+      <div class="slider-row">Annual return <input type="range" min="5" max="20" value="12" step="1" id="r-rate" oninput="updProj()"><span class="slider-val" id="r-rate-v">12%</span></div>
+      <div class="slider-row">Annual addition (Cr) <input type="range" min="0" max="5" value="1" step="0.1" id="r-add" oninput="updProj()"><span class="slider-val" id="r-add-v">1.0</span></div>
+      <div style="position:relative;height:200px"><canvas id="cProj"></canvas></div>
+      <div style="font-size:12px;color:var(--text2);margin-top:8px;text-align:center;font-family:'DM Mono',monospace" id="proj-lbl"></div>
+    </div>
+  </div>
+
+  <!-- ══════════ WHAT-IF SCENARIOS ══════════ -->
+  <div class="panel" id="panel-scenarios">
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Sell / liquidate an asset</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Asset to sell</label><select id="sc-asset" onchange="updSC()"></select></div>
+        <div class="form-group"><label>Sell percentage</label>
+          <div class="slider-row" style="margin:0"><input type="range" min="0" max="100" value="100" step="1" id="sc-pct" oninput="updSC()"><span class="slider-val" id="sc-pct-v">100%</span></div>
+        </div>
+      </div>
+      <div class="sc-result" id="sc-res"></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Market move scenario</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Asset type</label><select id="mm-type" onchange="updMM()"><option>Stocks / Brokerage</option><option>Real Estate</option><option>Mutual Fund</option><option>Retirement Plan</option><option>Bank Account</option></select></div>
+        <div class="form-group"><label>Price change (%)</label>
+          <div class="slider-row" style="margin:0"><input type="range" min="-80" max="100" value="20" step="1" id="mm-pct" oninput="updMM()"><span class="slider-val" id="mm-pct-v">+20%</span></div>
+        </div>
+      </div>
+      <div class="sc-result" id="mm-res"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">FX sensitivity</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px">How does your INR total change if exchange rates move?</p>
+      <div class="form-grid">
+        <div class="form-group"><label>USD/INR change (%)</label>
+          <div class="slider-row" style="margin:0"><input type="range" min="-30" max="30" value="0" step="1" id="fx-usd" oninput="updFX()"><span class="slider-val" id="fx-usd-v">0%</span></div>
+        </div>
+        <div class="form-group"><label>SGD/INR change (%)</label>
+          <div class="slider-row" style="margin:0"><input type="range" min="-30" max="30" value="0" step="1" id="fx-sgd" oninput="updFX()"><span class="slider-val" id="fx-sgd-v">0%</span></div>
+        </div>
+      </div>
+      <div class="sc-result" id="fx-res"></div>
+    </div>
+  </div>
+
+  <!-- ══════════ SNAPSHOTS ══════════ -->
+  <div class="panel" id="panel-snapshots">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <span style="font-weight:600;font-size:15px">Portfolio history</span>
+      <button class="btn-primary" onclick="takeSnap()">Save snapshot</button>
+    </div>
+    <div id="snap-list"></div>
+    <div class="card" id="snap-chart-wrap" style="display:none">
+      <div class="card-title">Net worth over time (INR Cr)</div>
+      <div style="position:relative;height:220px"><canvas id="cSnap"></canvas></div>
+    </div>
+    <div id="snap-empty" style="text-align:center;padding:60px 20px;color:var(--text2)">
+      <div style="font-size:32px;margin-bottom:12px">📸</div>
+      <div style="font-size:15px;font-weight:500;margin-bottom:6px">No snapshots yet</div>
+      <div style="font-size:13px">Hit "Save snapshot" to start tracking your net worth over time.</div>
+    </div>
+  </div>
+
+  <!-- ══════════ SAVINGS PLAN ══════════ -->
+  <div class="panel" id="panel-savings">
+    <div class="savings-hero">
+      <h3>Monthly savings target calculator</h3>
+      <div class="slider-row">Goal (Cr INR) <input type="range" min="10" max="500" value="100" step="5" id="sv-goal" oninput="updSavings()"><span class="slider-val" id="sv-goal-v">100 Cr</span></div>
+      <div class="slider-row">Target year <input type="range" min="2030" max="2060" value="2045" step="1" id="sv-year" oninput="updSavings()"><span class="slider-val" id="sv-year-v">2045</span></div>
+      <div class="slider-row">Expected return (%) <input type="range" min="6" max="20" value="12" step="1" id="sv-rate" oninput="updSavings()"><span class="slider-val" id="sv-rate-v">12%</span></div>
+      <div class="sum-grid" id="sv-cards" style="margin-top:14px;margin-bottom:0"></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Required monthly savings vs return rate</div>
+      <div style="position:relative;height:200px"><canvas id="cSavRate"></canvas></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Wealth accumulation breakdown</div>
+      <div class="legend" style="margin-bottom:10px"><span><i style="background:var(--green)"></i>From savings</span><span><i style="background:var(--purple)"></i>From current portfolio</span></div>
+      <div style="position:relative;height:200px"><canvas id="cSavStk"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Split between Person A & B</div>
+      <div class="slider-row">Person A share (%) <input type="range" min="0" max="100" value="50" step="5" id="sv-split" oninput="updSavings()"><span class="slider-val" id="sv-split-v">50%</span></div>
+      <div class="sc-result" id="sv-split-res"></div>
+    </div>
+  </div>
+
+  <!-- ══════════ IMPORT / EXPORT ══════════ -->
+  <div class="panel" id="panel-importex">
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Import from CSV</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px">
+        CSV must have columns: <code>name, owner, type, currency, value, institution</code>
+      </p>
+      <div class="drop-zone" id="drop-zone"
+        onclick="document.getElementById('csv-file').click()"
+        ondragover="event.preventDefault();this.classList.add('over')"
+        ondragleave="this.classList.remove('over')"
+        ondrop="handleDrop(event)">
+        <div class="drop-icon">⬆️</div>
+        <p>Click to browse or drag & drop a CSV</p>
+        <small>Accepted: .csv files only</small>
+      </div>
+      <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="handleFile(this)">
+      <div id="import-preview" style="display:none">
+        <div style="font-size:14px;font-weight:600;margin-bottom:10px" id="preview-title"></div>
+        <div style="overflow-x:auto;margin-bottom:12px"><table id="preview-table" style="font-size:12px"></table></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn-primary" onclick="confirmImport()">Import all</button>
+          <button class="btn-ghost" onclick="cancelImport()">Cancel</button>
+        </div>
+        <div style="font-size:12px;color:var(--text2);margin-top:8px" id="import-mode-note"></div>
+      </div>
+      <div id="import-msg"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Export portfolio</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn-primary" onclick="exportCSV()">⬇ Download CSV</button>
+        <button class="btn-ghost" onclick="exportJSON()">⬇ Download JSON</button>
+        <button class="btn-ghost" onclick="copyCSV()">⎘ Copy CSV</button>
+      </div>
+      <div id="export-msg" class="msg-success" style="text-align:left;margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Exchange rates</div>
+      <div class="rates-bar">
+        <span>1 USD = <input type="number" id="r-usd" value="83.5" style="width:80px"> INR</span>
+        <span>1 SGD = <input type="number" id="r-sgd" value="62.5" style="width:80px"> INR</span>
+        <button class="btn-ghost" style="padding:6px 14px" onclick="renderAll()">Update rates</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ADD ASSET MODAL ══════════ -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <h3>Add new asset</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Asset name</label><input type="text" id="n-name" placeholder="e.g. HDFC Savings"></div>
+      <div class="form-group"><label>Owner</label><select id="n-own"><option>Person A</option><option>Person B</option><option>Joint</option></select></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Type</label><select id="n-type"><option>Bank Account</option><option>Retirement Plan</option><option>Stocks / Brokerage</option><option>Real Estate</option><option>Mutual Fund</option><option>Fixed Deposit</option><option>Other</option></select></div>
+      <div class="form-group"><label>Currency</label><select id="n-cur"><option>INR</option><option>USD</option><option>SGD</option></select></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Current value</label><input type="number" id="n-val" placeholder="0" min="0"></div>
+      <div class="form-group"><label>Institution</label><input type="text" id="n-inst" placeholder="e.g. SBI, Fidelity"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn-primary" onclick="addAsset()">Add asset</button>
+      <button class="btn-ghost" onclick="document.getElementById('add-modal').classList.remove('open')">Cancel</button>
+    </div>
+    <div id="add-msg" class="msg-success"></div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h3>Edit asset</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Name</label><input type="text" id="e-name"></div>
+      <div class="form-group"><label>Owner</label><select id="e-owner"><option>Person A</option><option>Person B</option><option>Joint</option></select></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Type</label><select id="e-type"><option>Bank Account</option><option>Retirement Plan</option><option>Stocks / Brokerage</option><option>Real Estate</option><option>Mutual Fund</option><option>Fixed Deposit</option><option>Other</option></select></div>
+      <div class="form-group"><label>Currency</label><select id="e-cur"><option>INR</option><option>USD</option><option>SGD</option></select></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Value</label><input type="number" id="e-val" min="0"></div>
+      <div class="form-group"><label>Institution</label><input type="text" id="e-inst"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn-primary" onclick="saveEdit()">Save changes</button>
+      <button class="btn-ghost" onclick="document.getElementById('edit-modal').classList.remove('open')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let dispCur = 'INR', editIdx = -1, snapshots = [], charts = {}, pendingImport = [];
+
+let assets = [
+  { name:'Chase Checking', owner:'Person A', type:'Bank Account', currency:'USD', value:8000, institution:'Chase' },
+  { name:'DBS Savings', owner:'Person A', type:'Bank Account', currency:'SGD', value:25000, institution:'DBS' },
+  { name:'SBI Savings', owner:'Person B', type:'Bank Account', currency:'INR', value:1500000, institution:'SBI' },
+  { name:'HDFC Savings', owner:'Person B', type:'Bank Account', currency:'INR', value:800000, institution:'HDFC' },
+  { name:'Citibank Savings', owner:'Joint', type:'Bank Account', currency:'USD', value:12000, institution:'Citibank' },
+  { name:'401(k)', owner:'Person A', type:'Retirement Plan', currency:'USD', value:85000, institution:'Fidelity' },
+  { name:'Morgan Stanley', owner:'Person A', type:'Stocks / Brokerage', currency:'USD', value:42000, institution:'Morgan Stanley' },
+  { name:'IBKR Portfolio', owner:'Joint', type:'Stocks / Brokerage', currency:'USD', value:31000, institution:'IBKR' },
+  { name:'Arta Finance', owner:'Person B', type:'Stocks / Brokerage', currency:'USD', value:18000, institution:'Arta' },
+  { name:'EPF / PPF', owner:'Person B', type:'Retirement Plan', currency:'INR', value:4500000, institution:'EPFO' },
+  { name:'Mutual Funds', owner:'Person B', type:'Mutual Fund', currency:'INR', value:3200000, institution:'Zerodha' },
+  { name:'NPS', owner:'Person A', type:'Retirement Plan', currency:'INR', value:1200000, institution:'NPS Trust' },
+  { name:'House (equity)', owner:'Joint', type:'Real Estate', currency:'INR', value:8500000, institution:'—' },
+  { name:'FD - SBI', owner:'Person B', type:'Fixed Deposit', currency:'INR', value:700000, institution:'SBI' },
+  { name:'OCBC Account', owner:'Person A', type:'Bank Account', currency:'SGD', value:8000, institution:'OCBC' },
+];
+
+const TC = { 'Bank Account':'#4b9ef5','Retirement Plan':'#22c987','Stocks / Brokerage':'#f5a623','Real Estate':'#f07080','Mutual Fund':'#a78bfa','Fixed Deposit':'#6b7280','Other':'#374151' };
+const OC = { 'Person A':'#4b9ef5','Person B':'#f07080','Joint':'#22c987' };
+const TBadge = { 'Bank Account':'b-blue','Retirement Plan':'b-green','Stocks / Brokerage':'b-amber','Real Estate':'b-rose','Mutual Fund':'b-purple','Fixed Deposit':'b-gray','Other':'b-gray' };
+
+// ── FX ──
+function getR(c) {
+  const u = parseFloat(document.getElementById('r-usd').value) || 83.5;
+  const s = parseFloat(document.getElementById('r-sgd').value) || 62.5;
+  return c === 'USD' ? u : c === 'SGD' ? s : 1;
+}
+function toINR(v, c) { return v * getR(c); }
+function fromINR(v) {
+  if (dispCur === 'USD') return v / getR('USD');
+  if (dispCur === 'SGD') return v / getR('SGD');
+  return v;
+}
+function fmtD(inr) {
+  const v = fromINR(inr);
+  const sym = dispCur === 'INR' ? '₹' : dispCur === 'USD' ? '$' : 'S$';
+  if (dispCur === 'INR') {
+    if (v >= 10000000) return sym + (v / 10000000).toFixed(2) + ' Cr';
+    if (v >= 100000) return sym + (v / 100000).toFixed(1) + ' L';
+    return sym + Math.round(v).toLocaleString('en-IN');
+  }
+  return sym + Math.round(v).toLocaleString();
+}
+function fmtO(v, c) {
+  const sym = c === 'INR' ? '₹' : c === 'USD' ? '$' : 'S$';
+  if (c === 'INR') {
+    if (v >= 10000000) return sym + (v / 10000000).toFixed(2) + 'Cr';
+    if (v >= 100000) return sym + (v / 100000).toFixed(1) + 'L';
+    return sym + Math.round(v).toLocaleString('en-IN');
+  }
+  return sym + Math.round(v).toLocaleString();
+}
+function totalINR(list) { return (list || assets).reduce((s, a) => s + toINR(a.value, a.currency), 0); }
+function ownerINR(o) { return assets.filter(a => a.owner === o).reduce((s, a) => s + toINR(a.value, a.currency), 0); }
+function typeINR(t, list) { return (list || assets).filter(a => a.type === t).reduce((s, a) => s + toINR(a.value, a.currency), 0); }
+function dc(id) { if (charts[id]) { try { charts[id].destroy(); } catch(e){} delete charts[id]; } }
+
+// ── Overview ──
+function renderSummary() {
+  const tot = totalINR(), goal = 1e9, pct = Math.min(100, (tot / goal) * 100);
+  document.getElementById('g-pct').textContent = pct.toFixed(1) + '%';
+  document.getElementById('g-bar').style.width = pct + '%';
+  document.getElementById('g-cur').textContent = 'Current: ₹' + (tot / 1e7).toFixed(2) + ' Cr';
+  document.getElementById('g-rem').textContent = 'Remaining: ₹' + (Math.max(0, goal - tot) / 1e7).toFixed(2) + ' Cr';
+  document.getElementById('sum-cards').innerHTML = [
+    { l:'Total Portfolio', v:fmtD(tot), s:assets.length + ' assets', hi:true },
+    { l:'Person A', v:fmtD(ownerINR('Person A')), s:assets.filter(a => a.owner === 'Person A').length + ' assets' },
+    { l:'Person B', v:fmtD(ownerINR('Person B')), s:assets.filter(a => a.owner === 'Person B').length + ' assets' },
+    { l:'Joint', v:fmtD(ownerINR('Joint')), s:assets.filter(a => a.owner === 'Joint').length + ' assets' },
+  ].map(c => `<div class="scard${c.hi ? ' hi' : ''}"><div class="sl">${c.l}</div><div class="sv">${c.v}</div><div class="ss">${c.s}</div></div>`).join('');
+}
+
+function renderTypeChart() {
+  dc('type');
+  const types = [...new Set(assets.map(a => a.type))];
+  charts['type'] = new Chart(document.getElementById('cType'), {
+    type: 'doughnut',
+    data: { labels: types, datasets: [{ data: types.map(t => Math.round(fromINR(typeINR(t)))), backgroundColor: types.map(t => TC[t] || '#666'), borderWidth: 2, borderColor: '#16181c' }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, cutout:'70%' }
+  });
+  document.getElementById('lg-type').innerHTML = types.map(t => `<span><i style="background:${TC[t]||'#666'}"></i>${t.split(' / ')[0]}</span>`).join('');
+}
+
+function renderOwnerChart() {
+  dc('owner');
+  const own = ['Person A','Person B','Joint'];
+  charts['owner'] = new Chart(document.getElementById('cOwner'), {
+    type: 'doughnut',
+    data: { labels: own, datasets: [{ data: own.map(o => Math.round(fromINR(ownerINR(o)))), backgroundColor: own.map(o => OC[o]), borderWidth: 2, borderColor: '#16181c' }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, cutout:'70%' }
+  });
+  document.getElementById('lg-owner').innerHTML = own.map(o => `<span><i style="background:${OC[o]}"></i>${o}</span>`).join('');
+}
+
+function renderCurChart() {
+  dc('cur');
+  const curs = ['INR','USD','SGD'];
+  const data = curs.map(c => Math.round(fromINR(assets.filter(a => a.currency === c).reduce((s, a) => s + toINR(a.value, a.currency), 0))));
+  charts['cur'] = new Chart(document.getElementById('cCur'), {
+    type: 'bar',
+    data: { labels: ['INR assets','USD assets','SGD assets'], datasets: [{ data, backgroundColor: ['#a78bfa','#4b9ef5','#22c987'], borderRadius: 6, borderSkipped: false }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{ display:false }, ticks:{ color:'#8a8f9e' } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8a8f9e' } } } }
+  });
+}
+
+// ── Assets table ──
+function renderTable() {
+  document.getElementById('val-hdr').textContent = 'Value (' + dispCur + ')';
+  const q = (document.getElementById('srch').value || '').toLowerCase();
+  const filtered = assets.filter(a => !q || [a.name, a.institution, a.owner, a.type].some(x => x.toLowerCase().includes(q)));
+  document.getElementById('a-count').textContent = '(' + assets.length + ')';
+  document.getElementById('a-tbody').innerHTML = filtered.map(a => {
+    const ri = assets.indexOf(a);
+    return `<tr>
+      <td><span style="font-weight:600">${a.name}</span><br><span style="font-size:11px;color:var(--text2)">${a.institution}</span></td>
+      <td><span class="owner-dot" style="background:${OC[a.owner]}"></span>${a.owner}</td>
+      <td><span class="badge ${TBadge[a.type]||'b-gray'}">${a.type}</span></td>
+      <td style="font-family:'DM Mono',monospace">${fmtO(a.value, a.currency)}</td>
+      <td style="font-family:'DM Mono',monospace">${fmtD(toINR(a.value, a.currency))}</td>
+      <td><button class="btn-icon" onclick="openEdit(${ri})">Edit</button> <button class="btn-icon danger" onclick="delAsset(${ri})">Delete</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('t-cell').textContent = fmtD(totalINR());
+}
+
+function openEdit(i) {
+  editIdx = i; const a = assets[i];
+  document.getElementById('e-name').value = a.name;
+  document.getElementById('e-owner').value = a.owner;
+  document.getElementById('e-type').value = a.type;
+  document.getElementById('e-cur').value = a.currency;
+  document.getElementById('e-val').value = a.value;
+  document.getElementById('e-inst').value = a.institution;
+  document.getElementById('edit-modal').classList.add('open');
+}
+function saveEdit() {
+  if (editIdx < 0) return;
+  assets[editIdx] = { name:document.getElementById('e-name').value, owner:document.getElementById('e-owner').value, type:document.getElementById('e-type').value, currency:document.getElementById('e-cur').value, value:parseFloat(document.getElementById('e-val').value)||0, institution:document.getElementById('e-inst').value||'—' };
+  document.getElementById('edit-modal').classList.remove('open');
+  editIdx = -1; renderAll();
+}
+function delAsset(i) {
+  if (!confirm('Delete "' + assets[i].name + '"?')) return;
+  assets.splice(i, 1); renderAll();
+}
+
+function addAsset() {
+  const name = document.getElementById('n-name').value.trim();
+  const val = parseFloat(document.getElementById('n-val').value);
+  if (!name || !val || val <= 0) { document.getElementById('add-msg').textContent = 'Please fill in name and value.'; return; }
+  assets.push({ name, owner:document.getElementById('n-own').value, type:document.getElementById('n-type').value, currency:document.getElementById('n-cur').value, value:val, institution:document.getElementById('n-inst').value.trim()||'—' });
+  ['n-name','n-val','n-inst'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('add-msg').textContent = 'Asset added!';
+  setTimeout(() => { document.getElementById('add-msg').textContent = ''; document.getElementById('add-modal').classList.remove('open'); }, 1200);
+  renderAll();
+}
+
+// ── Breakdown ──
+function renderBreakdown() {
+  document.getElementById('pA-tot').textContent = fmtD(ownerINR('Person A'));
+  document.getElementById('pB-tot').textContent = fmtD(ownerINR('Person B'));
+  const types = [...new Set(assets.map(a => a.type))];
+  const mkPie = (id, owner, k) => {
+    dc(k);
+    const own = assets.filter(a => a.owner === owner || a.owner === 'Joint');
+    charts[k] = new Chart(document.getElementById(id), {
+      type: 'doughnut',
+      data: { labels: types, datasets: [{ data: types.map(t => Math.round(fromINR(own.filter(a => a.type === t).reduce((s, a) => s + toINR(a.value, a.currency), 0)))), backgroundColor: types.map(t => TC[t]), borderWidth: 2, borderColor: '#16181c' }] },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, cutout:'65%' }
+    });
+  };
+  mkPie('cPA','Person A','pA'); mkPie('cPB','Person B','pB');
+  dc('stk');
+  const own3 = ['Person A','Person B','Joint'];
+  const dsets = types.filter(t => typeINR(t) > 0).map(t => ({
+    label: t, data: own3.map(o => Math.round(fromINR(assets.filter(a => a.owner === o && a.type === t).reduce((s, a) => s + toINR(a.value, a.currency), 0)))),
+    backgroundColor: TC[t], borderRadius: 4
+  }));
+  charts['stk'] = new Chart(document.getElementById('cStk'), {
+    type: 'bar', data: { labels: own3, datasets: dsets },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ stacked:true, grid:{ display:false }, ticks:{ color:'#8a8f9e' } }, y:{ stacked:true, grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8a8f9e' } } } }
+  });
+  document.getElementById('lg-stacked').innerHTML = dsets.map(d => `<span><i style="background:${d.backgroundColor}"></i>${d.label.split(' ')[0]}</span>`).join('');
+  updProj();
+}
+
+function updProj() {
+  const rate = parseFloat(document.getElementById('r-rate').value) / 100;
+  const add = parseFloat(document.getElementById('r-add').value) * 1e7;
+  document.getElementById('r-rate-v').textContent = (rate * 100).toFixed(0) + '%';
+  document.getElementById('r-add-v').textContent = parseFloat(document.getElementById('r-add').value).toFixed(1);
+  const goal = 1e9; let v = totalINR(), reached = -1;
+  const labels = [], data = [];
+  for (let y = 0; y <= 30; y++) {
+    labels.push('Y' + y); data.push(+(v / 1e7).toFixed(2));
+    if (v >= goal && reached === -1) reached = y;
+    v = v * (1 + rate) + add;
+  }
+  document.getElementById('proj-lbl').textContent = reached >= 0
+    ? `✓ Goal reached in year ${reached} (${new Date().getFullYear() + reached})`
+    : '✗ Goal not reached within 30 years at these parameters';
+  dc('proj');
+  charts['proj'] = new Chart(document.getElementById('cProj'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label:'Portfolio', data, borderColor:'#22c987', backgroundColor:'rgba(34,201,135,0.08)', fill:true, tension:0.4, pointRadius:0 },
+      { label:'Goal', data:Array(31).fill(100), borderColor:'#f07080', borderDash:[5,5], borderWidth:1.5, pointRadius:0, fill:false }
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{ display:false }, ticks:{ maxTicksLimit:8, color:'#8a8f9e' } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ callback:v=>v+'Cr', color:'#8a8f9e' } } } }
+  });
+}
+
+// ── Scenarios ──
+function initSC() {
+  const sel = document.getElementById('sc-asset');
+  sel.innerHTML = assets.map((a, i) => `<option value="${i}">${a.name} (${fmtO(a.value, a.currency)})</option>`).join('');
+  updSC(); updMM(); updFX();
+}
+function updSC() {
+  const idx = parseInt(document.getElementById('sc-asset').value);
+  const pct = parseInt(document.getElementById('sc-pct').value);
+  document.getElementById('sc-pct-v').textContent = pct + '%';
+  const a = assets[idx], soldINR = toINR(a.value, a.currency) * (pct / 100), newTot = totalINR() - soldINR;
+  document.getElementById('sc-res').innerHTML = mkSR([
+    ['Proceeds', fmtD(soldINR), null],
+    ['New total', fmtD(newTot), newTot - totalINR()],
+    ['Remaining holding', fmtO(a.value * (1 - pct/100), a.currency), null],
+    ['New goal progress', ((newTot / 1e9) * 100).toFixed(1) + '%', null],
+  ]);
+}
+function updMM() {
+  const type = document.getElementById('mm-type').value, pct = parseInt(document.getElementById('mm-pct').value);
+  document.getElementById('mm-pct-v').textContent = (pct >= 0 ? '+' : '') + pct + '%';
+  const gain = assets.filter(a => a.type === type).reduce((s, a) => s + toINR(a.value, a.currency) * (pct / 100), 0);
+  const newTot = totalINR() + gain;
+  document.getElementById('mm-res').innerHTML = mkSR([
+    ['Assets affected', assets.filter(a => a.type === type).length + ' assets', null],
+    ['Portfolio impact', fmtD(Math.abs(gain)), gain],
+    ['New total', fmtD(newTot), null],
+    ['New goal progress', ((newTot / 1e9) * 100).toFixed(1) + '%', null],
+  ]);
+}
+function updFX() {
+  const uC = parseInt(document.getElementById('fx-usd').value) / 100, sC = parseInt(document.getElementById('fx-sgd').value) / 100;
+  document.getElementById('fx-usd-v').textContent = (uC >= 0 ? '+' : '') + Math.round(uC * 100) + '%';
+  document.getElementById('fx-sgd-v').textContent = (sC >= 0 ? '+' : '') + Math.round(sC * 100) + '%';
+  const bu = parseFloat(document.getElementById('r-usd').value) || 83.5, bs = parseFloat(document.getElementById('r-sgd').value) || 62.5;
+  const newTot = assets.reduce((s, a) => s + a.value * (a.currency === 'USD' ? bu*(1+uC) : a.currency === 'SGD' ? bs*(1+sC) : 1), 0);
+  const diff = newTot - totalINR();
+  document.getElementById('fx-res').innerHTML = mkSR([
+    ['New USD/INR', (bu*(1+uC)).toFixed(1), null],
+    ['New SGD/INR', (bs*(1+sC)).toFixed(1), null],
+    ['Portfolio impact', fmtD(Math.abs(diff)), diff],
+    ['New total (INR)', '₹' + (newTot / 1e7).toFixed(2) + ' Cr', null],
+  ]);
+}
+function mkSR(rows) {
+  return `<div class="sc-result">${rows.map(([l,v,d]) => `<div class="sc-item"><div class="scl">${l}</div><div class="scv">${v}</div>${d !== null ? `<div class="scd ${d >= 0 ? 'pos' : 'neg'}">${d >= 0 ? '+' : ''}${typeof d === 'number' ? fmtD(Math.abs(d)) : ''}</div>` : ''}</div>`).join('')}</div>`;
+}
+
+// ── Snapshots ──
+function takeSnap() {
+  snapshots.push({ date: new Date().toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }), total: totalINR(), count: assets.length });
+  renderSnapshots();
+}
+function renderSnapshots() {
+  const list = document.getElementById('snap-list'), empty = document.getElementById('snap-empty'), cw = document.getElementById('snap-chart-wrap');
+  if (!snapshots.length) { list.innerHTML = ''; empty.style.display = 'block'; cw.style.display = 'none'; return; }
+  empty.style.display = 'none'; cw.style.display = 'block';
+  list.innerHTML = snapshots.map((s, i) => {
+    const prev = i > 0 ? snapshots[i-1].total : null, diff = prev !== null ? s.total - prev : null;
+    return `<div class="snap-card"><div><div class="sn">${s.date}</div><div class="sd">${s.count} assets</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:600;font-family:'DM Mono',monospace">₹${(s.total/1e7).toFixed(2)} Cr</div>${diff !== null ? `<div class="${diff >= 0 ? 'pos' : 'neg'}">${diff >= 0 ? '+' : ''}₹${(diff/1e7).toFixed(2)} Cr</div>` : ''}</div></div>`;
+  }).join('');
+  dc('snap');
+  charts['snap'] = new Chart(document.getElementById('cSnap'), {
+    type: 'line',
+    data: { labels: snapshots.map(s => s.date), datasets: [{ label:'Total', data: snapshots.map(s => +(s.total/1e7).toFixed(2)), borderColor:'#22c987', backgroundColor:'rgba(34,201,135,0.08)', fill:true, tension:0.3, pointRadius:5, pointBackgroundColor:'#22c987' }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{ display:false }, ticks:{ color:'#8a8f9e' } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ callback:v=>v+'Cr', color:'#8a8f9e' } } } }
+  });
+}
+
+// ── Savings Plan ──
+function updSavings() {
+  const goalCr = parseFloat(document.getElementById('sv-goal').value);
+  const targetYear = parseInt(document.getElementById('sv-year').value);
+  const rate = parseFloat(document.getElementById('sv-rate').value) / 100;
+  const splitA = parseInt(document.getElementById('sv-split').value) / 100;
+  document.getElementById('sv-goal-v').textContent = goalCr + ' Cr';
+  document.getElementById('sv-year-v').textContent = targetYear;
+  document.getElementById('sv-rate-v').textContent = (rate * 100).toFixed(0) + '%';
+  document.getElementById('sv-split-v').textContent = Math.round(splitA * 100) + '%';
+  const years = Math.max(1, targetYear - new Date().getFullYear());
+  const goal = goalCr * 1e7, current = totalINR();
+  const portfolioFV = current * Math.pow(1 + rate, years);
+  const remaining = Math.max(0, goal - portfolioFV);
+  const monthlyRate = rate / 12, months = years * 12;
+  const monthly = monthlyRate > 0 ? remaining * monthlyRate / (Math.pow(1 + monthlyRate, months) - 1) : remaining / months;
+  document.getElementById('sv-cards').innerHTML = [
+    { l:'Monthly savings needed', v:'₹' + Math.round(monthly).toLocaleString('en-IN'), s:'to reach goal by ' + targetYear },
+    { l:'Annual total', v:'₹' + (monthly*12/100000).toFixed(1) + ' L', s:'per year' },
+    { l:'Years to goal', v:years + ' yrs', s:'target: ' + targetYear },
+    { l:'Portfolio contributes', v:'₹' + (portfolioFV/1e7).toFixed(1) + ' Cr', s:'at ' + (rate*100) + '% growth' },
+  ].map(c => `<div class="scard"><div class="sl">${c.l}</div><div class="sv" style="font-size:18px;font-family:'DM Mono',monospace">${c.v}</div><div class="ss">${c.s}</div></div>`).join('');
+  document.getElementById('sv-split-res').innerHTML = `<div class="sc-result"><div class="sc-item"><div class="scl">Person A monthly</div><div class="scv" style="font-family:'DM Mono',monospace">₹${Math.round(monthly*splitA).toLocaleString('en-IN')}</div><div class="scd" style="color:var(--text2)">${Math.round(splitA*100)}% share</div></div><div class="sc-item"><div class="scl">Person B monthly</div><div class="scv" style="font-family:'DM Mono',monospace">₹${Math.round(monthly*(1-splitA)).toLocaleString('en-IN')}</div><div class="scd" style="color:var(--text2)">${Math.round((1-splitA)*100)}% share</div></div></div>`;
+  dc('savrate');
+  const rates = [6,8,10,12,14,16,18,20];
+  const mRates = rates.map(r => { const mr=r/100/12, pFV=current*Math.pow(1+r/100,years), rem=Math.max(0,goal-pFV); return mr>0?rem*mr/(Math.pow(1+mr,months)-1):rem/months; });
+  charts['savrate'] = new Chart(document.getElementById('cSavRate'), {
+    type: 'bar',
+    data: { labels: rates.map(r => r + '%'), datasets: [{ data: mRates.map(v => Math.round(v/1000)), backgroundColor: rates.map(r => r === rate*100 ? '#22c987' : 'rgba(75,158,245,0.4)'), borderRadius:5, borderSkipped:false }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:ctx=>'₹'+Math.round(ctx.raw)+'K/mo' } } }, scales:{ x:{ grid:{ display:false }, ticks:{ color:'#8a8f9e' } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ callback:v=>v+'K', color:'#8a8f9e' } } } }
+  });
+  dc('savstk');
+  const yearLabels = Array.from({ length:years+1 }, (_, y) => new Date().getFullYear() + y);
+  const portData = yearLabels.map((_, y) => +(current * Math.pow(1+rate, y) / 1e7).toFixed(2));
+  const savData = yearLabels.map((_, y) => { if(!y)return 0; const m=y*12; return +((monthlyRate>0?monthly*(Math.pow(1+monthlyRate,m)-1)/monthlyRate:monthly*m)/1e7).toFixed(2); });
+  charts['savstk'] = new Chart(document.getElementById('cSavStk'), {
+    type: 'bar',
+    data: { labels: yearLabels, datasets: [{ label:'Portfolio', data:portData, backgroundColor:'#a78bfa', borderRadius:2, stack:'s' }, { label:'Savings', data:savData, backgroundColor:'#22c987', borderRadius:2, stack:'s' }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ stacked:true, grid:{ display:false }, ticks:{ maxTicksLimit:8, color:'#8a8f9e' } }, y:{ stacked:true, grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ callback:v=>v+'Cr', color:'#8a8f9e' } } } }
+  });
+}
+
+// ── CSV Import/Export ──
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+  if (!['name','value','currency'].every(r => headers.includes(r))) throw new Error('Missing required columns: name, value, currency');
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const vals = []; let cur = '', inQ = false;
+    for (let c of line) { if (c === '"') inQ = !inQ; else if (c === ',' && !inQ) { vals.push(cur.trim()); cur = ''; } else cur += c; }
+    vals.push(cur.trim());
+    const obj = {}; headers.forEach((h, i) => obj[h] = (vals[i]||'').replace(/^"|"$/g,'').trim());
+    return { name:obj.name||'Unnamed', owner:obj.owner||'Person A', type:obj.type||'Other', currency:(obj.currency||'INR').toUpperCase(), value:parseFloat(obj.value)||0, institution:obj.institution||'—' };
+  }).filter(a => a.value > 0);
+}
+function handleFile(input) { const f = input.files[0]; if (!f) return; const r = new FileReader(); r.onload = e => { try { showPreview(parseCSV(e.target.result)); } catch(err) { document.getElementById('import-msg').innerHTML = '<span class="msg-error">' + err.message + '</span>'; } }; r.readAsText(f); }
+function handleDrop(e) { e.preventDefault(); document.getElementById('drop-zone').classList.remove('over'); const f = e.dataTransfer.files[0]; if (!f || !f.name.endsWith('.csv')) { document.getElementById('import-msg').innerHTML = '<span class="msg-error">Please drop a .csv file</span>'; return; } const r = new FileReader(); r.onload = ev => { try { showPreview(parseCSV(ev.target.result)); } catch(err) { document.getElementById('import-msg').innerHTML = '<span class="msg-error">' + err.message + '</span>'; } }; r.readAsText(f); }
+function showPreview(parsed) {
+  pendingImport = parsed;
+  document.getElementById('preview-title').textContent = 'Preview: ' + parsed.length + ' assets found';
+  document.getElementById('import-mode-note').textContent = 'This will replace your current ' + assets.length + ' assets.';
+  const t = document.getElementById('preview-table');
+  t.innerHTML = `<thead><tr><th>Name</th><th>Owner</th><th>Type</th><th>Currency</th><th>Value</th><th>Institution</th></tr></thead><tbody>${parsed.slice(0,6).map(a=>`<tr><td>${a.name}</td><td>${a.owner}</td><td>${a.type}</td><td>${a.currency}</td><td>${fmtO(a.value,a.currency)}</td><td>${a.institution}</td></tr>`).join('')}${parsed.length>6?`<tr><td colspan="6" style="color:var(--text2);font-size:12px">… and ${parsed.length-6} more</td></tr>`:''}</tbody>`;
+  document.getElementById('import-preview').style.display = 'block';
+  document.getElementById('import-msg').innerHTML = '';
+}
+function confirmImport() { assets = [...pendingImport]; pendingImport = []; document.getElementById('import-preview').style.display = 'none'; document.getElementById('csv-file').value = ''; document.getElementById('import-msg').innerHTML = '<span class="msg-success">Imported ' + assets.length + ' assets successfully!</span>'; renderAll(); setTimeout(() => document.getElementById('import-msg').innerHTML = '', 3000); }
+function cancelImport() { pendingImport = []; document.getElementById('import-preview').style.display = 'none'; document.getElementById('csv-file').value = ''; }
+function toCSV() { const h = 'name,owner,type,currency,value,institution'; const rows = assets.map(a => [a.name,a.owner,a.type,a.currency,a.value,a.institution].map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')); return h + '\n' + rows.join('\n'); }
+function exportCSV() { const blob = new Blob([toCSV()], { type:'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'wealth-tracker-' + new Date().toISOString().slice(0,10) + '.csv'; a.click(); URL.revokeObjectURL(url); showExportMsg('CSV downloaded!'); }
+function exportJSON() { const blob = new Blob([JSON.stringify({ assets, exportedAt:new Date().toISOString() }, null, 2)], { type:'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'wealth-tracker-' + new Date().toISOString().slice(0,10) + '.json'; a.click(); URL.revokeObjectURL(url); showExportMsg('JSON downloaded!'); }
+function copyCSV() { navigator.clipboard.writeText(toCSV()).then(() => showExportMsg('Copied to clipboard!')).catch(() => { const ta = document.createElement('textarea'); ta.value = toCSV(); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); showExportMsg('Copied!'); }); }
+function showExportMsg(m) { const el = document.getElementById('export-msg'); el.textContent = m; setTimeout(() => el.textContent = '', 3000); }
+
+// ── Navigation ──
+function showP(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'breakdown') renderBreakdown();
+  if (name === 'scenarios') initSC();
+  if (name === 'snapshots') renderSnapshots();
+  if (name === 'savings') updSavings();
+}
+function setCur(c, btn) {
+  dispCur = c;
+  document.querySelectorAll('.ctog').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAll();
+}
+
+// ── Render all ──
+function renderAll() {
+  renderSummary(); renderTypeChart(); renderOwnerChart(); renderCurChart(); renderTable();
+  const id = document.querySelector('.panel.active')?.id;
+  if (id === 'panel-breakdown') renderBreakdown();
+  if (id === 'panel-scenarios') initSC();
+  if (id === 'panel-snapshots') renderSnapshots();
+  if (id === 'panel-savings') updSavings();
+}
+
+// Close modals on backdrop click
+document.querySelectorAll('.modal-overlay').forEach(el => el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); }));
+
+// Init
+document.getElementById('sub-date').textContent = 'Family portfolio · ' + new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+setTimeout(renderAll, 80);
+</script>
+</body>
+</html>

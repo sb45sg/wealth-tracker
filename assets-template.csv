@@ -1,0 +1,16 @@
+name,owner,type,currency,value,institution
+Chase Checking,Person A,Bank Account,USD,0,Chase
+DBS Savings,Person A,Bank Account,SGD,0,DBS
+OCBC Account,Person A,Bank Account,SGD,0,OCBC
+SBI Savings,Person B,Bank Account,INR,0,SBI
+HDFC Savings,Person B,Bank Account,INR,0,HDFC
+Citibank Savings,Joint,Bank Account,USD,0,Citibank
+401(k),Person A,Retirement Plan,USD,0,Fidelity
+NPS,Person A,Retirement Plan,INR,0,NPS Trust
+EPF / PPF,Person B,Retirement Plan,INR,0,EPFO
+Morgan Stanley,Person A,Stocks / Brokerage,USD,0,Morgan Stanley
+IBKR Portfolio,Joint,Stocks / Brokerage,USD,0,IBKR
+Arta Finance,Person B,Stocks / Brokerage,USD,0,Arta
+Mutual Funds,Person B,Mutual Fund,INR,0,Zerodha
+House (equity),Joint,Real Estate,INR,0,—
+FD - SBI,Person B,Fixed Deposit,INR,0,SBI

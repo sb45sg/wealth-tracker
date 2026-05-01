@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wealth Tracker — Family Portfolio</title>
+  <script>
+    // Auth guard — redirect to login if no session
+    (function() {
+      if (!sessionStorage.getItem('wt_session')) {
+        window.location.href = 'login.html';
+      }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -37,10 +45,45 @@
     }
     /* ── Layout ── */
     .shell { max-width: 1100px; margin: 0 auto; padding: 0 20px 60px; }
+    /* ── User header bar ── */
+    .user-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0 0; border-bottom: 1px solid var(--border); margin-bottom: 0;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .user-bar-left { display: flex; align-items: center; gap: 12px; }
+    .logo-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #000; }
+    .app-name { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+    .user-bar-right { display: flex; align-items: center; gap: 10px; }
+    .user-chip { display: flex; align-items: center; gap: 8px; padding: 5px 12px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 20px; font-size: 12px; color: var(--text2); }
+    .user-avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #000; }
+    .btn-drive { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 8px; background: none; border: 1px solid var(--border2); font-size: 12px; color: var(--text2); cursor: pointer; transition: all .15s; }
+    .btn-drive:hover { background: var(--bg3); color: var(--text); }
+    .btn-drive.syncing { color: var(--green); border-color: rgba(34,201,135,0.3); }
+    .btn-signout { background: none; border: none; font-size: 12px; color: var(--text3); cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+    .btn-signout:hover { color: var(--rose); }
+    .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+    .sync-dot.ok { background: var(--green); }
+    .sync-dot.syncing { background: var(--amber); animation: blink .8s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Drive sync toast ── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 999;
+      background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px;
+      padding: 14px 18px; display: flex; align-items: center; gap: 10px;
+      font-size: 13px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      transform: translateY(80px); opacity: 0; transition: all .3s ease;
+      max-width: 320px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: rgba(34,201,135,0.3); }
+    .toast.error { border-color: rgba(248,113,113,0.3); }
+
     /* ── Topbar ── */
     .topbar {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 24px 0 0; gap: 12px; flex-wrap: wrap;
+      padding: 20px 0 0; gap: 12px; flex-wrap: wrap;
     }
     .brand { display: flex; align-items: baseline; gap: 10px; }
     .brand h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
@@ -229,11 +272,26 @@
 </head>
 <body>
 <div class="shell">
+
+  <!-- USER BAR -->
+  <div class="user-bar">
+    <div class="user-bar-left">
+      <div class="logo-mark">W</div>
+      <span class="app-name">WealthTrack</span>
+    </div>
+    <div class="user-bar-right">
+      <div class="sync-dot" id="sync-dot"></div>
+      <button class="btn-drive" id="drive-btn" onclick="syncToDrive()">☁ Save to Drive</button>
+      <div class="user-chip"><div class="user-avatar" id="user-avatar">?</div><span id="user-email-chip">Loading…</span></div>
+      <button class="btn-signout" onclick="signOut()" title="Sign out">Sign out</button>
+    </div>
+  </div>
+
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="brand">
-      <h1>Wealth Tracker</h1>
-      <span id="sub-date">Family portfolio</span>
+      <h1 id="portfolio-title">Family Portfolio</h1>
+      <span id="sub-date">Loading…</span>
     </div>
     <div class="cur-toggle">
       <button class="ctog active" onclick="setCur('INR',this)">INR</button>
@@ -890,8 +948,225 @@ function renderAll() {
 // Close modals on backdrop click
 document.querySelectorAll('.modal-overlay').forEach(el => el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); }));
 
+// ── Session & Auth ──
+let SESSION = null;
+function initSession() {
+  const raw = sessionStorage.getItem('wt_session');
+  if (!raw) { window.location.href = 'login.html'; return; }
+  SESSION = JSON.parse(raw);
+
+  // User bar
+  const initials = (SESSION.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+  document.getElementById('user-avatar').textContent = initials;
+  document.getElementById('user-email-chip').textContent = SESSION.email || '';
+
+  // Personalized title
+  const pA = SESSION.name ? SESSION.name.split(' ')[0] : 'Person A';
+  const pB = SESSION.partnerName ? SESSION.partnerName.split(' ')[0] : 'Person B';
+  document.getElementById('portfolio-title').textContent = pA + ' & ' + pB + '\'s Portfolio';
+
+  // Apply profile settings
+  const profile = SESSION.profile;
+  if (profile) {
+    if (profile.rates) {
+      const ru = document.getElementById('r-usd'), rs = document.getElementById('r-sgd');
+      if (ru && profile.rates.usd) ru.value = profile.rates.usd;
+      if (rs && profile.rates.sgd) rs.value = profile.rates.sgd;
+    }
+  }
+
+  // Load saved assets
+  const saved = localStorage.getItem('wt_assets_' + SESSION.email);
+  if (saved) {
+    try { const parsed = JSON.parse(saved); if (Array.isArray(parsed) && parsed.length) assets = parsed; } catch(e) {}
+  }
+
+  document.getElementById('sub-date').textContent = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+}
+
+function signOut() {
+  if (!confirm('Sign out of WealthTrack?')) return;
+  sessionStorage.removeItem('wt_session');
+  window.location.href = 'login.html';
+}
+
+// ── Auto-save to localStorage ──
+function autoSave() {
+  if (!SESSION) return;
+  localStorage.setItem('wt_assets_' + SESSION.email, JSON.stringify(assets));
+  setSyncDot('ok');
+}
+
+function setSyncDot(state) {
+  const dot = document.getElementById('sync-dot');
+  dot.className = 'sync-dot' + (state ? ' ' + state : '');
+}
+
+// ── Drive Save (generates downloadable CSVs) ──
+function syncToDrive() {
+  if (!SESSION) return;
+  const btn = document.getElementById('drive-btn');
+  btn.classList.add('syncing');
+  btn.textContent = '↻ Saving…';
+  setSyncDot('syncing');
+
+  setTimeout(() => {
+    // Build portfolio CSV
+    const portfolioCSV = buildPortfolioCSV();
+    // Build tracking CSV with snapshot history
+    const trackingCSV = buildTrackingCSV();
+
+    downloadFile(portfolioCSV, 'wealthtrack-portfolio-' + fmtDate() + '.csv', 'text/csv');
+    setTimeout(() => {
+      downloadFile(trackingCSV, 'wealthtrack-tracking-history-' + fmtDate() + '.csv', 'text/csv');
+    }, 500);
+
+    btn.classList.remove('syncing');
+    btn.textContent = '☁ Save to Drive';
+    setSyncDot('ok');
+    showToast('success', '☁ 2 files downloaded — drag them to your Google Drive folder!');
+  }, 900);
+}
+
+function fmtDate() { return new Date().toISOString().slice(0,10); }
+
+function buildPortfolioCSV() {
+  const profile = SESSION.profile || {};
+  const pA = profile.personA || {};
+  const pB = profile.personB || {};
+  const goals = profile.goals || {};
+  const rates = profile.rates || {};
+
+  const header = [
+    '# WEALTHTRACK PORTFOLIO EXPORT',
+    '# Generated: ' + new Date().toISOString(),
+    '# Household: ' + (SESSION.name || '') + ' & ' + (SESSION.partnerName || ''),
+    '',
+    '## HOUSEHOLD PROFILE',
+    'field,person_a,person_b',
+    ['Name', pA.name || SESSION.name, pB.name || SESSION.partnerName],
+    ['Date of Birth', pA.dob, pB.dob],
+    ['Nationality', pA.nationality, pB.nationality],
+    ['Country', pA.country, pB.country],
+    ['Occupation', pA.occupation, pB.occupation],
+    ['Employer', pA.employer, pB.employer],
+    ['Annual Income', (pA.income||'') + ' ' + (pA.incomeCur||''), (pB.income||'') + ' ' + (pB.incomeCur||'')],
+    '',
+    '## GOALS',
+    'metric,value',
+    ['Retirement Goal (Cr INR)', goals.retirementGoal || '100'],
+    ['Target Year', goals.targetYear || '2045'],
+    ['Expected Return (%)', goals.expectedReturn || '12'],
+    ['Risk Appetite', goals.risk || 'moderate'],
+    '',
+    '## EXCHANGE RATES',
+    'pair,rate',
+    ['USD/INR', rates.usd || '83.5'],
+    ['SGD/INR', rates.sgd || '62.5'],
+    '',
+    '## ASSETS',
+    'name,owner,type,currency,value,institution,value_inr',
+  ].map(r => Array.isArray(r) ? r.map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',') : r).join('\n');
+
+  const assetRows = assets.map(a => {
+    const inr = Math.round(toINR(a.value, a.currency));
+    return [a.name, a.owner, a.type, a.currency, a.value, a.institution, inr]
+      .map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',');
+  }).join('\n');
+
+  const totINR = Math.round(totalINR());
+  const summary = [
+    '',
+    '## SUMMARY',
+    'metric,value_inr,value_display',
+    '"Total Portfolio","' + totINR + '","₹' + (totINR/1e7).toFixed(2) + ' Cr"',
+    '"Person A Total","' + Math.round(ownerINR('Person A')) + '","₹' + (ownerINR('Person A')/1e7).toFixed(2) + ' Cr"',
+    '"Person B Total","' + Math.round(ownerINR('Person B')) + '","₹' + (ownerINR('Person B')/1e7).toFixed(2) + ' Cr"',
+    '"Joint Total","' + Math.round(ownerINR('Joint')) + '","₹' + (ownerINR('Joint')/1e7).toFixed(2) + ' Cr"',
+    '"Goal Progress (%)","' + ((totINR / 1e9) * 100).toFixed(2) + '%",""',
+  ].join('\n');
+
+  return header + '\n' + assetRows + summary;
+}
+
+function buildTrackingCSV() {
+  const header = [
+    '# WEALTHTRACK TRACKING HISTORY',
+    '# Generated: ' + new Date().toISOString(),
+    '',
+    '## SNAPSHOT HISTORY',
+    'date,total_inr,total_cr,asset_count,person_a_inr,person_b_inr,joint_inr',
+  ].join('\n');
+
+  const rows = snapshots.map(s => [
+    s.date,
+    Math.round(s.total),
+    (s.total/1e7).toFixed(2),
+    s.count,
+    Math.round(s.pA || 0),
+    Math.round(s.pB || 0),
+    Math.round(s.joint || 0),
+  ].map(v => '"' + v + '"').join(',')).join('\n');
+
+  // Add current state as latest row
+  const now = new Date().toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+  const latest = [now, Math.round(totalINR()), (totalINR()/1e7).toFixed(2), assets.length, Math.round(ownerINR('Person A')), Math.round(ownerINR('Person B')), Math.round(ownerINR('Joint'))].map(v=>`"${v}"`).join(',');
+
+  return header + '\n' + (rows ? rows + '\n' : '') + latest;
+}
+
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Toast ──
+let toastTimer;
+function showToast(type, msg) {
+  let toast = document.getElementById('wt-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'wt-toast';
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.className = 'toast ' + type;
+  toast.innerHTML = msg;
+  clearTimeout(toastTimer);
+  setTimeout(() => toast.classList.add('show'), 10);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+}
+
+// ── Patch takeSnap to store owner totals ──
+const _origTakeSnap = takeSnap;
+// Override takeSnap to record per-owner data
+function takeSnap() {
+  snapshots.push({
+    date: new Date().toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }),
+    total: totalINR(), count: assets.length,
+    pA: ownerINR('Person A'), pB: ownerINR('Person B'), joint: ownerINR('Joint'),
+  });
+  autoSave();
+  renderSnapshots();
+}
+
+// ── Patch renderAll to auto-save ──
+const _origRenderAll = renderAll;
+function renderAll() {
+  renderSummary(); renderTypeChart(); renderOwnerChart(); renderCurChart(); renderTable();
+  const id = document.querySelector('.panel.active')?.id;
+  if (id === 'panel-breakdown') renderBreakdown();
+  if (id === 'panel-scenarios') initSC();
+  if (id === 'panel-snapshots') renderSnapshots();
+  if (id === 'panel-savings') updSavings();
+  autoSave();
+}
+
 // Init
-document.getElementById('sub-date').textContent = 'Family portfolio · ' + new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+initSession();
 setTimeout(renderAll, 80);
 </script>
 </body>
